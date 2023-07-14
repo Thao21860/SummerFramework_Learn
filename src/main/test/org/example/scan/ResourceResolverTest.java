@@ -1,10 +1,7 @@
 package org.example.scan;
 
-import jdk.nashorn.internal.runtime.regexp.joni.Config;
-import org.example.DI.YamlUtils;
+import org.example.utils.YamlUtils;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.*;
 
 public class ResourceResolverTest {
@@ -20,6 +17,7 @@ public class ResourceResolverTest {
         System.out.println("========");
         Set<String> names = pros.stringPropertyNames();
         System.out.println(names);
+
 
     }
 }

@@ -1,4 +1,4 @@
-package org.example.DI;
+package org.example.utils;
 
 import org.yaml.snakeyaml.Yaml;
 import java.io.InputStream;

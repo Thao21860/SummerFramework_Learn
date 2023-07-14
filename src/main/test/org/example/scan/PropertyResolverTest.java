@@ -1,14 +1,10 @@
 package org.example.scan;
 
-import org.example.DI.PropertyResolver;
-import org.example.DI.YamlUtils;
+import org.example.config.PropertyResolver;
+import org.example.utils.YamlUtils;
 import org.junit.Test;
 
-import java.io.FileInputStream;
-import java.io.FileReader;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Properties;
 
 import static org.junit.Assert.*;

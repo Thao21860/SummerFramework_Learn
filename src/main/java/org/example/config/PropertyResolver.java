@@ -1,4 +1,4 @@
-package org.example.DI;
+package org.example.config;
 
 import com.sun.istack.internal.NotNull;
 
@@ -151,6 +151,7 @@ public class PropertyResolver {
         return Objects.requireNonNull(value,"Property'" + key + "' not found");
     }
     // 类型转换
+    @SuppressWarnings("unchecked")
     <T> T convert(Class<?> clazz, String value){
         Function<String, Object> fn = this.converters.get(clazz);
         if(fn == null){

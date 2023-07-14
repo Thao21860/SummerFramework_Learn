@@ -1,4 +1,4 @@
-package org.example.DI;
+package org.example.config;
 
 import java.util.Objects;
 
@@ -24,7 +24,7 @@ public class PropertyExpr {
     public String toString() {
         return "PropertyExpr{" +
                 "key='" + key + '\'' +
-                ", defualtValue='" + defaultValue + '\'' +
+                ", defaultValue='" + defaultValue + '\'' +
                 '}';
     }
 

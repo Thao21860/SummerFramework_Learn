@@ -16,7 +16,7 @@ public class ResourceResolver {
     public ResourceResolver(String basePackage) {
         this.basePackage = basePackage;
     }
-    //
+
     public <R>List<R> scan(Function<Resource,R> mapper) throws URISyntaxException, IOException {
         String basePackagePath = this.basePackage.replace(".", "\\");
         String pkgPath = basePackagePath;
