@@ -108,7 +108,6 @@ public class ClassUtils {
         throw new NoUniqueBeanDefinitionException(String.format("Multiple methods with @%s found in class %s",
                 annoClass.getSimpleName(), clazz.getName()));
     }
-
     public static Method getNamedMethod(Class<?> clazz, String methodName){
         try{
             return clazz.getDeclaredMethod(methodName);

@@ -5,34 +5,58 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.example.annotation.*;
 import org.example.config.PropertyResolver;
-import org.example.exception.BeanCreationException;
-import org.example.exception.BeanDefinitionException;
-import org.example.exception.NoUniqueBeanDefinitionException;
+import org.example.exception.*;
 import org.example.scan.ResourceResolver;
+import org.example.test.ConfigT1;
 import org.example.utils.ClassUtils;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.*;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.stream.Collectors;
 
 // 负责bean管理
 public class AnnotationConfigApplicationContext {
+    PropertyResolver propertyResolver;
     Map<String,BeanDefinition> beans;
-
+    // 创建实例集合
+    Set<String> creatingBeanNames;
     // 注册beans
-    public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException {
+    public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException, ClassNotFoundException {
         // 扫描所有Bean 的 class类型
         Set<String> beanClassNames = scanForClassNames(configClass);
         // 创建beans definition
         this.beans = createBeanDefinitions(beanClassNames);
-        System.out.println("done");
+
+        this.propertyResolver = propertyResolver;
+
+        this.creatingBeanNames = new HashSet<>();
+        // 首先创建configuration类中的bean
+        this.beans.values().stream()
+                        .filter(this::isConfiguration).map(def->{
+                        //创建实例
+                        createBeanAsEarlySingleton(def);
+                        return def.getName();
+                        }).collect(Collectors.toList());
+        // 过滤剩余
+        List<BeanDefinition> defs = this.beans.values().stream()
+                        .filter(def->def.getInstance() == null).sorted().collect(Collectors.toList());
+        // 创建普通bean
+        defs.forEach(def ->{
+            if(def.getInstance() == null){
+                createBeanAsEarlySingleton(def);
+            }
+        });
+        // 初始化所有bean
+//        this.beans.values().stream().sorted().forEach(def -> {
+//
+//        });
+        System.out.println("application Construct done");
     }
 
-    private Map<String, BeanDefinition> createBeanDefinitions(Set<String> classNameSet) {
+    private Map<String, BeanDefinition> createBeanDefinitions(Set<String> classNameSet) throws ClassNotFoundException {
         Map<String,BeanDefinition> defs = new HashMap<>();
         for(String name: classNameSet){
             Class<?> clazz = null;
@@ -107,9 +131,7 @@ public class AnnotationConfigApplicationContext {
             for(Class<?> importConfigClass: importConfig.value()){
                 String importClassName = importConfigClass.getName();
                 // 可能已经存在,忽略
-                if(!classNameSet.contains(importClassName)){
-                    classNameSet.add(importClassName);
-                }
+                classNameSet.add(importClassName);
             }
         }
         return classNameSet;
@@ -210,7 +232,7 @@ public class AnnotationConfigApplicationContext {
         }
     }
 
-    void scanImport(Set<String> classNameSet, Class<?> clazz, Map<String,BeanDefinition> defs){
+    void scanImport(Set<String> classNameSet, Class<?> clazz, Map<String,BeanDefinition> defs) throws ClassNotFoundException {
         // 读取import参数
         Import imp = ClassUtils.findAnnotation(clazz, Import.class);
         Class<?>[] impList = imp.value();
@@ -219,16 +241,122 @@ public class AnnotationConfigApplicationContext {
                 //创建对应的BeanDefinition对象
                 String name = impE.getSimpleName();
                 name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
-                System.out.println(name);
-                BeanDefinition def = new BeanDefinition(name,clazz,getSuitableConstructor(clazz),
-                                                        getOrder(clazz),clazz.isAnnotationPresent(Primary.class),
-                                                        null,null,
-                                                        ClassUtils.findAnnotationMethod(clazz, PostConstruct.class),
-                                                        ClassUtils.findAnnotationMethod(clazz, PreDestroy.class));
-                addBeanDefinition(defs,def);
+                String re = impE.getName();
+                try{
+                    Class<?> reClazz = Class.forName(re);
+                    BeanDefinition def = new BeanDefinition(name,reClazz,getSuitableConstructor(reClazz),
+                            getOrder(reClazz),reClazz.isAnnotationPresent(Primary.class),
+                            null,null,
+                            ClassUtils.findAnnotationMethod(reClazz, PostConstruct.class),
+                            ClassUtils.findAnnotationMethod(reClazz, PreDestroy.class));
+                    addBeanDefinition(defs,def);
+                }catch (Exception e){
+                    throw new ClassNotFoundException(String.format("can not found class:%s",re));
+                }
+//                System.out.println(name);
             }
         }
     }
 
+    // 过滤configuration 使用
+    boolean isConfiguration(BeanDefinition def){
+        return ClassUtils.findAnnotation(def.getBeanClass(), Configuration.class) != null;
+    }
+
+    // 查找bean
+    @SuppressWarnings("unchecked")
+    public <T> T getBean(String name){
+        BeanDefinition def = this.beans.get(name);
+        if(def == null){
+            throw new BeansException(String.format("no such bean defined with name '%s'",name));
+        }
+        return (T) def.getRequiredInstance();
+    }
+
+    //创建
+    public Object createBeanAsEarlySingleton(BeanDefinition def){
+        if(!this.creatingBeanNames.add(def.getName())){
+            // 重复创建,检测到循环依赖
+            throw new UnsatisfiedDependencyException();
+        }
+
+        // 判定为工厂方法还是构造方法创建
+        Executable createFn = def.getFactoryName() == null? def.getConstructor():def.getFactoryMethod();
+        // 获取参数上的注解
+        final Parameter[] parameters = createFn.getParameters();
+        Object[] args = new Object[parameters.length];
+        // 一个参数可能会有多个注解
+        final Annotation[][] parametersAnno = createFn.getParameterAnnotations();
+        // 遍历参数
+        for(int i = 0; i < parameters.length; i++){
+            final Parameter param = parameters[i];
+            final Annotation[] paramAnnos = parametersAnno[i];
+            // 获取注解
+            final Value value = ClassUtils.getAnnotation(paramAnnos, Value.class);
+            final AutoWired autoWired = ClassUtils.getAnnotation(paramAnnos, AutoWired.class);
+
+            // configuration中bean的工厂方法,不允许使用Autowired注入
+            final boolean isConfiguration = isConfiguration(def);
+            if(isConfiguration && autoWired != null){
+                throw new BeanCreationException(
+                        String.format("Cannot specify @Autowired when create @Configuration bean '%s': %s.", def.getName(), def.getBeanClass().getName()));
+            }
+
+            if(value != null && autoWired != null){
+                throw new BeanCreationException(
+                        String.format("Cannot specify both @Autowired and @Value when create bean '%s': %s.", def.getName(), def.getBeanClass().getName()));
+            }
+            if(value == null && autoWired == null){
+                throw new BeanCreationException(
+                        String.format("must specify  @Autowired or @Value when create bean '%s': %s.", def.getName(), def.getBeanClass().getName()));
+            }
+            // 参数类型
+            final Class<?> type = param.getType();
+
+            if(value != null){
+                // 使用 @value 注入 值
+                args[i] = this.propertyResolver.getRequiredProperty(value.value(),type);
+            }else {
+                // autowired 注入 引用类型
+                String name = autoWired.name();
+                boolean required = autoWired.value();
+                BeanDefinition dependsOnDef = name.isEmpty()? findBeanDefinition(type):findBeanDefinition(name);
+
+                if(dependsOnDef != null){
+                    Object autowiredBeanInstance = dependsOnDef.getInstance();
+                    // 进入此片段，isConfiguration一定为false
+                    if(autowiredBeanInstance == null && ! isConfiguration){
+                        // 依赖类未创建，且不是configuration时，递归
+                        autowiredBeanInstance = createBeanAsEarlySingleton(dependsOnDef);
+                    }
+                    args[i] = autowiredBeanInstance;
+                }else {
+                    args[i] = null;
+                }
+            }
+        }
+
+        // 创建bean实例
+        // 强依赖注入
+        Object instance = null;
+        if(def.getFactoryName() == null){
+            // constructor 创建
+            try{
+                instance = def.getConstructor().newInstance(args);
+            }catch (Exception e){
+                throw new BeanCreationException(String.format("Exception when create bean '%s': %s", def.getName(), def.getBeanClass().getName()), e);
+            }
+        }else {
+            // 工厂方法创建
+            Object configInstance = getBean(def.getFactoryName());
+            try{
+                instance = def.getFactoryMethod().invoke(configInstance,args);
+            }catch (Exception e){
+                throw new BeanCreationException(String.format("Exception when create bean '%s': %s", def.getName(), def.getBeanClass().getName()), e);
+            }
+        }
+        def.setInstance(instance);
+        return def.getInstance();
+    }
 
 }

@@ -1,5 +1,6 @@
 package org.example.test;
 
+import org.example.annotation.AutoWired;
 import org.example.annotation.Bean;
 import org.example.annotation.Configuration;
 import org.example.annotation.Import;
@@ -11,4 +12,5 @@ public class ConfigT1 {
     public ContextT1 getT1(){
         return new ContextT1();
     }
+
 }

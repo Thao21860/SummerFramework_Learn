@@ -1,16 +1,19 @@
 package org.example.ioc;
 
+import org.example.exception.BeansException;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 
 //从注解中提取信息用于创建Bean
-public class BeanDefinition {
+public class BeanDefinition implements Comparable<BeanDefinition> {
     // Bean name
     String name;
     // Bean 声明的类型，实际类型可能为其子类，实际类型不必存储，因为可以通过instance.getClass()获得
     Class<?> beanClass;
     Object instance = null;
     Constructor<?> constructor;
+    // 工厂所在bean的名字
     String factoryName;
     Method factoryMethod;
     int order;
@@ -94,6 +97,18 @@ public class BeanDefinition {
         return destroyMethod;
     }
 
+    public void setInstance(Object instance) {
+        this.instance = instance;
+    }
+
+    public Object getRequiredInstance() {
+        if (this.instance == null) {
+            throw new BeansException(String.format("Instance of bean with name '%s' and type '%s' is not instantiated during current stage.",
+                    this.getName(), this.getBeanClass().getName()));
+        }
+        return this.instance;
+    }
+
     @Override
     public String toString() {
         return "BeanDefinition{" +
@@ -110,5 +125,15 @@ public class BeanDefinition {
                 ", initMethod=" + initMethod +
                 ", destroyMethod=" + destroyMethod +
                 '}';
+    }
+
+    @Override
+    public int compareTo(BeanDefinition o) {
+        int cmp = Integer.compare(this.order, o.getOrder());
+        if(cmp != 0){
+            return cmp;
+        }
+        //无order则名字对比
+        return this.name.compareTo(o.getName());
     }
 }
