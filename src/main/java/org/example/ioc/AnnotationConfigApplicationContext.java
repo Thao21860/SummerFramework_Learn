@@ -9,6 +9,8 @@ import org.example.exception.*;
 import org.example.scan.ResourceResolver;
 import org.example.test.ConfigT1;
 import org.example.utils.ClassUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -19,7 +21,8 @@ import java.util.stream.Collectors;
 
 // 负责bean管理
 public class AnnotationConfigApplicationContext {
-    PropertyResolver propertyResolver;
+    protected final Logger logger = LoggerFactory.getLogger(getClass());
+    protected final PropertyResolver propertyResolver;
     Map<String,BeanDefinition> beans;
     // 创建实例集合
     Set<String> creatingBeanNames;
@@ -49,11 +52,145 @@ public class AnnotationConfigApplicationContext {
                 createBeanAsEarlySingleton(def);
             }
         });
+
         // 初始化所有bean
-//        this.beans.values().stream().sorted().forEach(def -> {
-//
-//        });
+        // setter注入字段依赖
+        this.beans.values().forEach(this::injectBean);
+
+        this.beans.values().forEach(this::initBean);
+
+
+        // 调用init方法
+
+
         System.out.println("application Construct done");
+    }
+
+    // 调用bean的init方法
+    private void initBean(BeanDefinition def) {
+        callMethod(def.getInstance(), def.getInitMethod(), def.getInitMethodName());
+    }
+    // init/destroy 通用
+    private void callMethod(Object bean, Method initMethod, String initMethodName) {
+
+        if(initMethod != null){
+            try {
+                initMethod.invoke(bean);
+            }catch (ReflectiveOperationException e){
+                throw new BeanCreationException(e);
+            }
+        }else if (initMethodName != null){
+            Method method = ClassUtils.getNamedMethod(bean.getClass(), initMethodName);
+            method.setAccessible(true);
+            try {
+                method.invoke(bean);
+            }catch (ReflectiveOperationException e){
+                throw new BeanCreationException(e);
+            }
+        }
+    }
+
+    private void injectBean(BeanDefinition def) {
+        try{
+            injectProperties(def, def.getBeanClass(),def.getInstance());
+        }catch (ReflectiveOperationException e){
+            throw new BeanCreationException(e);
+        }
+    }
+
+    private void injectProperties(BeanDefinition def, Class<?> beanClass, Object bean) throws InvocationTargetException, IllegalAccessException {
+        // 在当前类查找
+        for(Field f:beanClass.getDeclaredFields()){
+            tryInjectProperties(def,beanClass, bean, f);
+        }
+        for(Method m: beanClass.getDeclaredMethods()){
+            tryInjectProperties(def,beanClass,bean,m);
+        }
+        
+    }
+
+    private void tryInjectProperties(BeanDefinition def, Class<?> beanClass, Object bean, AccessibleObject acc) throws IllegalAccessException, InvocationTargetException {
+        Value value = acc.getAnnotation(Value.class);
+        AutoWired autoWired = acc.getAnnotation(AutoWired.class);
+        if(value == null && autoWired == null) return;
+
+        Field field = null;
+        Method method = null;
+        if(acc instanceof Field){
+            Field f = (Field) acc;
+            // 检查是否为final方法，或者为static 或 final字段
+            checkFieldOrMethod(f);
+            f.setAccessible(true);
+            field = f;
+        }
+        if(acc instanceof Method){
+            Method m = (Method) acc;
+            // 检查是否为final方法，或者为static 或 final字段
+            checkFieldOrMethod(m);
+            // setter 方法参数为1
+            if(m.getParameters().length != 1){
+                throw new BeanDefinitionException(
+                        String.format("Cannot inject a non-setter method %s for bean '%s': %s", m.getName(), def.getName(), def.getBeanClass().getName()));
+            }
+            m.setAccessible(true);
+            method = m;
+        }
+        // 获取参数名和类型
+        String accessibleName = field != null ? field.getName() : method.getName();
+        Class<?> accessibleType = field != null ? field.getType() : method.getParameterTypes()[0];
+        // value注入properties
+        if (value != null){
+            // 获取配置文件中key = value.value 并转换为accessibleType
+            Object propValue = this.propertyResolver.getRequiredProperty(value.value(),accessibleType);
+            // value 注入字段
+            if (field != null){
+                field.set(bean, propValue);
+            }
+            if (method != null){
+                method.invoke(bean, propValue);
+            }
+        }
+
+        // autowired注入
+        if (autoWired != null){
+            String name = autoWired.name();
+            boolean required = autoWired.value();
+            Object depends = name.isEmpty() ? findBean(accessibleType) : findBean(name,accessibleType);
+            if(required && depends == null){
+                // 注解缺少参数
+                throw new UnsatisfiedDependencyException(String.format("Dependency bean %s not found when inject %s.%s for bean '%s': %s", beanClass.getSimpleName(),
+                        accessibleName, def.getName(), def.getBeanClass().getName()));
+            }
+            if( depends != null){
+                if(field != null){
+                    field.set(bean,depends);
+                }
+                if ( method != null){
+                    method.invoke(bean, depends);
+                }
+            }
+        }
+
+
+    }
+
+    private void checkFieldOrMethod(Member f) {
+        int mod = f.getModifiers();
+        if(Modifier.isStatic(mod)){
+            // 静态变量/类变量不是对象的属性,而是一个类的属性,spring则是基于对象层面上的依赖注入. 推荐使用setter注入
+            throw new BeanCreationException(String.format("can not inject static field %s", f.getName()));
+        }
+        if(Modifier.isFinal(mod)){
+            if(f instanceof Field){
+                Field field = (Field) f;
+                throw new BeanDefinitionException("can not inject final field"+field);
+            }
+            if(f instanceof Method){
+                Method method = (Method) f;
+                // bean被代理时可能无法执行final方法
+                logger.warn("Inject final method should be careful because it is not called on target bean when bean is proxied and may cause NullPointerException.");
+            }
+        }
     }
 
     private Map<String, BeanDefinition> createBeanDefinitions(Set<String> classNameSet) throws ClassNotFoundException {
@@ -159,12 +296,51 @@ public class AnnotationConfigApplicationContext {
             throw new NoUniqueBeanDefinitionException(String.format("Multiple bean with type '%s' found, but multiple @Primary specified.", type.getName()));
         }
     }
+    @Nullable
+    public BeanDefinition findBeanDefinition(String name, Class<?> requiredType){
+        BeanDefinition def = findBeanDefinition(name);
+        if(def == null){
+            return null;
+        }
+        // 判断两个类之间的关系
+        if(!requiredType.isAssignableFrom(def.getBeanClass())){
+            throw new BeanNotOfRequiredTypeException(String.format("Autowire required type '%s' but bean '%s' has actual type '%s'.", requiredType.getName(),
+                    name, def.getBeanClass().getName()));
+        }
+        return def;
+    }
     List<BeanDefinition> findBeanDefinitions(Class<?> type){
         return this.beans.values().stream()
                 // 按类型筛选，isAssignableFrom 判断是否相同，或是否为type父类
                 .filter(def -> type.isAssignableFrom(def.getBeanClass()))
                 //排序
                 .sorted().collect(Collectors.toList());
+    }
+    // 查找bean
+    // by-type
+    @Nullable
+    @SuppressWarnings("unchecked")
+    <T> T findBean(Class<T> requiredType){
+        BeanDefinition def = findBeanDefinition(requiredType);
+        return def == null ? null : (T)def.getRequiredInstance();
+    }
+    // by-name
+    @Nullable
+    @SuppressWarnings("unchecked")
+    <T> T findBean(String name,Class<T> requiredType){
+        BeanDefinition def = findBeanDefinition(name, requiredType);
+        if (def == null){
+            return null;
+        }
+        return (T) def.getRequiredInstance();
+
+    }
+
+    // beans
+    <T> List<T> findBeans(Class<T> requiredType){
+        return findBeanDefinitions(requiredType).stream()
+                .map(def -> (T) def.getRequiredInstance())
+                .collect(Collectors.toList());
     }
 
     Constructor<?> getSuitableConstructor(Class<?> clazz){
