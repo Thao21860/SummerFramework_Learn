@@ -20,14 +20,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 // 负责bean管理
-public class AnnotationConfigApplicationContext {
+public class AnnotationConfigApplicationContext implements ConfigurableApplicationContext {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     protected final PropertyResolver propertyResolver;
-    Map<String,BeanDefinition> beans;
+    protected final Map<String,BeanDefinition> beans;
     // 需要创建实例集合
-    Set<String> creatingBeanNames;
+    private final Set<String> creatingBeanNames;
     // post processor
-    private List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
+    private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
 
     // 注册beans
     public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException, ClassNotFoundException {
@@ -337,7 +337,7 @@ public class AnnotationConfigApplicationContext {
         }
         return def;
     }
-    List<BeanDefinition> findBeanDefinitions(Class<?> type){
+    public List<BeanDefinition> findBeanDefinitions(Class<?> type){
         return this.beans.values().stream()
                 // 按类型筛选，isAssignableFrom 判断是否相同，或是否为type父类
                 .filter(def -> type.isAssignableFrom(def.getBeanClass()))
@@ -467,7 +467,12 @@ public class AnnotationConfigApplicationContext {
         return ClassUtils.findAnnotation(def.getBeanClass(), Configuration.class) != null;
     }
 
-    // 查找bean
+    @Override
+    public boolean containsBean(String name) {
+        return this.beans.containsKey(name);
+    }
+
+    // 用户查找bean接口
     @SuppressWarnings("unchecked")
     public <T> T getBean(String name){
         BeanDefinition def = this.beans.get(name);
@@ -475,6 +480,55 @@ public class AnnotationConfigApplicationContext {
             throw new BeansException(String.format("no such bean defined with name '%s'",name));
         }
         return (T) def.getRequiredInstance();
+    }
+
+    @Override
+    public <T> T getBean(String name, Class<T> requiredType) {
+        T t = findBean(name, requiredType);
+        if(t == null){
+            throw new BeansException(String.format("no such bean defined with name '%s'",name));
+        }
+        return t;
+    }
+    /**
+     * 通过Type查找Bean，不存在抛出NoSuchBeanDefinitionException，存在多个但缺少唯一@Primary标注抛出NoUniqueBeanDefinitionException
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T getBean(Class<T> requiredType) {
+        BeanDefinition def = findBeanDefinition(requiredType);
+        if(def == null){
+            throw new BeansException(String.format("no such bean defined with type '%s'",requiredType));
+        }
+        return (T) def.getRequiredInstance();
+    }
+
+    @Override
+    public <T> List<T> getBeans(Class<T> requiredType) {
+        List<BeanDefinition> defs = findBeanDefinitions(requiredType);
+        if(defs.isEmpty()){
+            return Collections.emptyList();
+        }
+        List<T> list = new ArrayList<>(defs.size());
+        for(BeanDefinition def: defs){
+            list.add((T) def.getRequiredInstance());
+        }
+        return list;
+    }
+    // 关闭容器，并调用Bean的destroy方法
+    @Override
+    public void close() {
+        logger.info("Closing{}...",this.getClass().getName());
+        this.beans.values().forEach(def ->{
+            // 获取原始对象
+            final Object beanInstance = getTargetInstance(def);
+            callMethod(beanInstance, def.getDestroyMethod(),def.getDestroyMethodName());
+        });
+        // 清空容器
+        this.beans.clear();
+        logger.info("{} closed",this.getClass().getName());
+
+
     }
 
     //创建
