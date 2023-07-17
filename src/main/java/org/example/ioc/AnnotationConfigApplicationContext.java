@@ -24,8 +24,11 @@ public class AnnotationConfigApplicationContext {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     protected final PropertyResolver propertyResolver;
     Map<String,BeanDefinition> beans;
-    // 创建实例集合
+    // 需要创建实例集合
     Set<String> creatingBeanNames;
+    // post processor
+    private List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
+
     // 注册beans
     public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException, ClassNotFoundException {
         // 扫描所有Bean 的 class类型
@@ -43,7 +46,14 @@ public class AnnotationConfigApplicationContext {
                         createBeanAsEarlySingleton(def);
                         return def.getName();
                         }).collect(Collectors.toList());
-        // 过滤剩余
+        // 创建PostProcessor
+        List<BeanPostProcessor> postProcessors = this.beans.values().stream()
+                .filter(this::isBeanPostProcessor)
+                .sorted()
+                .map(def-> (BeanPostProcessor) createBeanAsEarlySingleton(def)).collect(Collectors.toList());
+
+        this.beanPostProcessors.addAll(postProcessors);
+        // 过滤剩余未创建实例的
         List<BeanDefinition> defs = this.beans.values().stream()
                         .filter(def->def.getInstance() == null).sorted().collect(Collectors.toList());
         // 创建普通bean
@@ -54,16 +64,17 @@ public class AnnotationConfigApplicationContext {
         });
 
         // 初始化所有bean
-        // setter注入字段依赖
+        // setter注入字段依赖，弱依赖注入
         this.beans.values().forEach(this::injectBean);
-
+        // 调用init方法
         this.beans.values().forEach(this::initBean);
 
-
-        // 调用init方法
-
-
         System.out.println("application Construct done");
+    }
+
+    private boolean isBeanPostProcessor(BeanDefinition def) {
+//        return def instanceof BeanPostProcessor; def 是容器不能用于判断
+        return BeanPostProcessor.class.isAssignableFrom(def.getBeanClass());
     }
 
     // 调用bean的init方法
@@ -91,11 +102,28 @@ public class AnnotationConfigApplicationContext {
     }
 
     private void injectBean(BeanDefinition def) {
+        // 获取被代理类的实例
+        Object beanInstance = getTargetInstance(def);
         try{
-            injectProperties(def, def.getBeanClass(),def.getInstance());
+            injectProperties(def, def.getBeanClass(),beanInstance);
         }catch (ReflectiveOperationException e){
             throw new BeanCreationException(e);
         }
+    }
+
+    private Object getTargetInstance(BeanDefinition def) {
+        Object beanInstance = def.getInstance();
+
+        List<BeanPostProcessor> reverseProcessors = new ArrayList<>(this.beanPostProcessors);
+        Collections.reverse(reverseProcessors);
+        for (BeanPostProcessor processor: reverseProcessors){
+            // 如何获取原始bean交由postProcessOnSetProperty的实现类实现，一般是在processor对象内保存
+            Object restoreInstance = processor.postProcessOnSetProperty(beanInstance, def.getName());
+            if(restoreInstance != beanInstance){
+                beanInstance = restoreInstance;
+            }
+        }
+        return beanInstance;
     }
 
     private void injectProperties(BeanDefinition def, Class<?> beanClass, Object bean) throws InvocationTargetException, IllegalAccessException {
@@ -463,7 +491,7 @@ public class AnnotationConfigApplicationContext {
         Object[] args = new Object[parameters.length];
         // 一个参数可能会有多个注解
         final Annotation[][] parametersAnno = createFn.getParameterAnnotations();
-        // 遍历参数
+        // 遍历参数, 获取/创建所需参数
         for(int i = 0; i < parameters.length; i++){
             final Parameter param = parameters[i];
             final Annotation[] paramAnnos = parametersAnno[i];
@@ -532,6 +560,17 @@ public class AnnotationConfigApplicationContext {
             }
         }
         def.setInstance(instance);
+        // 调用post processor, 创建Bean postProcessor时此集合为空
+        for(BeanPostProcessor processor : this.beanPostProcessors){
+            Object processed = processor.postProcessBeforeInitialization(def.getInstance(),def.getName());
+            if (processed == null){
+                throw new BeanCreationException(String.format("PostBeanProcessor returns null when process bean '%s' by %s", def.getName(), processor));
+            }
+            // processor替换原始bean
+            if(def.getInstance() != processed){
+                def.setInstance(processed);
+            }
+        }
         return def.getInstance();
     }
 
