@@ -31,9 +31,9 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
 
     // 注册beans
     public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException, ClassNotFoundException {
-        // 扫描所有Bean 的 class类型
+        // 1. 扫描所有Bean 的 class类型 获取全限定名,供Class.forName使用
         Set<String> beanClassNames = scanForClassNames(configClass);
-        // 创建beans definition
+        // 2. 创建beans definition
         this.beans = createBeanDefinitions(beanClassNames);
 
         this.propertyResolver = propertyResolver;
@@ -232,7 +232,6 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
             }
             // 查找Component标注
             // 所有操作被ClassUtils封装
-            // TODO import的不会含有component注解，会丢失
             Component component = ClassUtils.findAnnotation(clazz, Component.class);
             if(component != null){
                 //排除抽象、私有类
@@ -243,7 +242,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
                 if(Modifier.isPrivate(mod)){
                     throw new BeanDefinitionException(clazz.getName() + "is private class");
                 }
-                // 创建bena
+                // 创建BeanDefinition
                 String beanName = ClassUtils.getBeanName(clazz);
 
                 BeanDefinition beanDefinition = new BeanDefinition(beanName,clazz,getSuitableConstructor(clazz),
@@ -441,6 +440,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
         Import imp = ClassUtils.findAnnotation(clazz, Import.class);
         Class<?>[] impList = imp.value();
         for(Class<?> impE: impList){
+            // 保证name在扫描的包下， 没必要保证
             if(classNameSet.contains(impE.getName())){
                 //创建对应的BeanDefinition对象
                 String name = impE.getSimpleName();
@@ -594,7 +594,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
             }
         }
 
-        // 创建bean实例
+        // 调用创建方法（工厂/构造方法）创建bean实例
         // 强依赖注入
         Object instance = null;
         if(def.getFactoryName() == null){
