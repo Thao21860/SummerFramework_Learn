@@ -1,8 +1,10 @@
 package org.example.test;
 
 import org.example.annotation.*;
+import org.example.test2.ContextT3;
+import org.example.test2.ContextT4;
 
-@Configuration
+//@Configuration
 @Import(ContextT3.class)
 public class ConfigT1 {
     // value必须给定key

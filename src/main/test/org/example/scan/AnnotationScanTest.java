@@ -1,17 +1,15 @@
 package org.example.scan;
 
 import org.example.annotation.Import;
-import org.example.config.PropertyResolver;
 import org.example.ioc.AnnotationConfigApplicationContext;
 import org.example.ioc.BeanDefinition;
 import org.example.test.ConfigT1;
 import org.example.test.ContextT1;
-import org.example.test.ContextT3;
+import org.example.test2.ContextT3;
 import org.example.utils.ClassUtils;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 

@@ -1,4 +1,4 @@
-package org.example.test;
+package org.example.test2;
 
 public class ContextT3 {
 }

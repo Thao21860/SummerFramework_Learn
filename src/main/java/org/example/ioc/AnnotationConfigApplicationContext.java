@@ -7,7 +7,6 @@ import org.example.annotation.*;
 import org.example.config.PropertyResolver;
 import org.example.exception.*;
 import org.example.scan.ResourceResolver;
-import org.example.test.ConfigT1;
 import org.example.utils.ClassUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -216,7 +215,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
                 throw new BeanDefinitionException("can not inject final field"+field);
             }
             if(f instanceof Method){
-                Method method = (Method) f;
+//                Method method = (Method) f;
                 // bean被代理时可能无法执行final方法
                 logger.warn("Inject final method should be careful because it is not called on target bean when bean is proxied and may cause NullPointerException.");
             }
@@ -231,6 +230,9 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
                 clazz = Class.forName(name);
             } catch (ClassNotFoundException e){
                 throw new BeanCreationException(e);
+            }
+            if (clazz.isAnnotation() || clazz.isEnum() || clazz.isInterface()){
+                continue;
             }
             // 查找Component标注
             // 所有操作被ClassUtils封装
@@ -263,7 +265,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
                     scanFactoryMethods(beanName, clazz, defs);
                 }
             }
-            // 扫描import并加入
+            // 创建 import 导入类的BeanDefinition
             Import imp = ClassUtils.findAnnotation(clazz, Import.class);
             if(imp != null){
                 scanImport(classNameSet,clazz,defs);
@@ -291,7 +293,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
             });
             classNameSet.addAll(classList);
         }
-        // 搜索@import
+        // 搜索@import,import 注解 只有在传入的configClass上才有效
         Import importConfig = configClass.getAnnotation(Import.class);
         if(importConfig != null){
             for(Class<?> importConfigClass: importConfig.value()){
@@ -366,6 +368,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
     }
 
     // beans
+    @SuppressWarnings("unchecked")
     <T> List<T> findBeans(Class<T> requiredType){
         return findBeanDefinitions(requiredType).stream()
                 .map(def -> (T) def.getRequiredInstance())
@@ -442,24 +445,20 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
         Import imp = ClassUtils.findAnnotation(clazz, Import.class);
         Class<?>[] impList = imp.value();
         for(Class<?> impE: impList){
-            // 保证name在扫描的包下， 没必要保证
-            if(classNameSet.contains(impE.getName())){
-                //创建对应的BeanDefinition对象
-                String name = impE.getSimpleName();
-                name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
-                String re = impE.getName();
-                try{
-                    Class<?> reClazz = Class.forName(re);
-                    BeanDefinition def = new BeanDefinition(name,reClazz,getSuitableConstructor(reClazz),
-                            getOrder(reClazz),reClazz.isAnnotationPresent(Primary.class),
-                            null,null,
-                            ClassUtils.findAnnotationMethod(reClazz, PostConstruct.class),
-                            ClassUtils.findAnnotationMethod(reClazz, PreDestroy.class));
-                    addBeanDefinition(defs,def);
-                }catch (Exception e){
-                    throw new ClassNotFoundException(String.format("can not found class:%s",re));
-                }
-//                System.out.println(name);
+            //创建对应的BeanDefinition对象
+            String name = impE.getSimpleName();
+            name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
+            String re = impE.getName();
+            try{
+                Class<?> reClazz = Class.forName(re);
+                BeanDefinition def = new BeanDefinition(name,reClazz,getSuitableConstructor(reClazz),
+                        getOrder(reClazz),reClazz.isAnnotationPresent(Primary.class),
+                        null,null,
+                        ClassUtils.findAnnotationMethod(reClazz, PostConstruct.class),
+                        ClassUtils.findAnnotationMethod(reClazz, PreDestroy.class));
+                addBeanDefinition(defs,def);
+            }catch (Exception e){
+                throw new ClassNotFoundException(String.format("can not found class:%s",re));
             }
         }
     }
@@ -506,6 +505,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public <T> List<T> getBeans(Class<T> requiredType) {
         List<BeanDefinition> defs = findBeanDefinitions(requiredType);
         if(defs.isEmpty()){
@@ -586,7 +586,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
                 if(dependsOnDef != null){
                     Object autowiredBeanInstance = dependsOnDef.getInstance();
                     // 进入此片段，isConfiguration一定为false
-                    if(autowiredBeanInstance == null && ! isConfiguration){
+                    if(autowiredBeanInstance == null){
                         // 依赖类未创建，且不是configuration时，递归
                         autowiredBeanInstance = createBeanAsEarlySingleton(dependsOnDef);
                     }
