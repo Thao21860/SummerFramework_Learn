@@ -1,7 +1,8 @@
-package org.example.test;
+package org.example.test.postPorcessor;
 
 import org.example.annotation.Component;
 import org.example.ioc.BeanPostProcessor;
+import org.example.test.ContextT2;
 
 import java.util.HashMap;
 import java.util.Map;

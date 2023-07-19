@@ -9,7 +9,6 @@ import org.example.test.ContextT2;
 import org.example.utils.YamlUtils;
 import org.junit.Before;
 import org.junit.Test;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -37,7 +36,7 @@ public class PostProcessorTest {
 //    @Test
     public void test2() throws ClassNotFoundException {
         Class<?> a = Class.forName("org.example.ioc.BeanPostProcessor");
-        Class<?> b = Class.forName("org.example.test.PostProcessorOne");
+        Class<?> b = Class.forName("org.example.test.postPorcessor.PostProcessorOne");
         Class<?> c = Class.forName("org.example.ioc.BeanDefinition");
         System.out.println(a.isAssignableFrom(c));
 

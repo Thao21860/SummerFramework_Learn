@@ -1,9 +1,11 @@
 package org.example.test;
 
+import org.example.annotation.Around;
 import org.example.annotation.Component;
 import org.example.annotation.Value;
 
 @Component
+@Around("politeInvocationHandler")
 public class ContextT2 {
     @Value("${contextT2.key}")
     public String key;

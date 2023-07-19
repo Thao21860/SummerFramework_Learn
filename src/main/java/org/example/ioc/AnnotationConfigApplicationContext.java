@@ -31,6 +31,8 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
 
     // 注册beans
     public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) throws URISyntaxException, IOException, ClassNotFoundException {
+        // aop实现关键
+        ApplicationContextUtils.setApplicationContext(this);
         // 1. 扫描所有Bean 的 class类型 获取全限定名,供Class.forName使用
         Set<String> beanClassNames = scanForClassNames(configClass);
         // 2. 创建beans definition
@@ -39,7 +41,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
         this.propertyResolver = propertyResolver;
 
         this.creatingBeanNames = new HashSet<>();
-        // 首先创建configuration类中的bean
+        // 首先创建configuration类的bean，不创建内部的bean
         this.beans.values().stream()
                         .filter(this::isConfiguration).map(def->{
                         //创建实例
@@ -56,7 +58,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
         // 过滤剩余未创建实例的
         List<BeanDefinition> defs = this.beans.values().stream()
                         .filter(def->def.getInstance() == null).sorted().collect(Collectors.toList());
-        // 创建普通bean
+        // 创建普通bean、component标注的bean、AOP拦截器等
         defs.forEach(def ->{
             if(def.getInstance() == null){
                 createBeanAsEarlySingleton(def);
@@ -526,6 +528,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
         });
         // 清空容器
         this.beans.clear();
+        ApplicationContextUtils.setApplicationContext(null);
         logger.info("{} closed",this.getClass().getName());
 
 
