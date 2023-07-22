@@ -5,10 +5,14 @@ app:
 # standard structure for datasource, mail, etc:
 summer:
   datasource:
-    url: jdbc:hsqldb:file:testdb.tmp
-    username: sa
-    password:
-    auto-commit: ${AUTO_COMMIT:false}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://192.168.201.100:3306/mytest?characterEncoding=utf-8
+    username: root
+    password: root
+    max-pool-size: '10'
+    min-pool-size: '2'
+    time-out: '2000'
+    auto-commit: '${AUTO_COMMIT:false}'
 
 # test data types:
 other:

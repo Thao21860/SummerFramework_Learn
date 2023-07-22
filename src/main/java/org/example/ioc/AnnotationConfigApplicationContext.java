@@ -200,7 +200,6 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
             }
         }
 
-
     }
 
     private void checkFieldOrMethod(Member f) {
@@ -293,7 +292,7 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
             });
             classNameSet.addAll(classList);
         }
-        // 搜索@import,import 注解 只有在传入的configClass上才有效
+        // 在传入的configClass中搜索@import,import 注解
         Import importConfig = configClass.getAnnotation(Import.class);
         if(importConfig != null){
             for(Class<?> importConfigClass: importConfig.value()){
@@ -449,6 +448,9 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
             String name = impE.getSimpleName();
             name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
             String re = impE.getName();
+            if (classNameSet.contains(re)){
+                continue;
+            }
             try{
                 Class<?> reClazz = Class.forName(re);
                 BeanDefinition def = new BeanDefinition(name,reClazz,getSuitableConstructor(reClazz),

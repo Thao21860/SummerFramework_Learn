@@ -45,7 +45,7 @@ public class YamlUtils {
                 for (int i = 0; i < list.size(); i++) {
                     Object subEle = list.get(i);
                     if(subEle instanceof String){
-                        flatMap.put(newKey +  "[" + i + "]",subEle);
+                        flatMap.put(newKey +  "[" + i + "]", subEle);
                     }
                     else if (subEle instanceof Map){
                         flatMap.putAll(flatten((Map<String, Object>) list.get(i), newKey + "[" + i + "]"));

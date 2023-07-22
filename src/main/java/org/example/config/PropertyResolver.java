@@ -14,14 +14,11 @@ public class PropertyResolver {
     public PropertyResolver(Properties props) {
         // 环境变量
         this.properties.putAll(System.getenv());
-        // stringPropertyNames需要key 和 value 都是 String类型，会出现配置遗留
+        // stringPropertyNames需要key 和 value 都是 String类型，会出现配置遗漏
         Set<String> names = props.stringPropertyNames();
 //        Set<String> names = props.stringPropertyNames();
         for(String name:names){
             this.properties.put(name,props.getProperty(name));
-            if(name == "contextT2.key"){
-                System.out.println("find");
-            }
         }
         // register converter
         converters.put(String.class, s->s);
