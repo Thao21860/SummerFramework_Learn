@@ -6,7 +6,8 @@ app:
 summer:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.201.100:3306/mytest?characterEncoding=utf-8
+#    url: jdbc:mysql://192.168.201.100:3306/mytest?characterEncoding=utf-8
+    url: jdbc:mysql://localhost:3306/test?characterEncoding=utf-8
     username: root
     password: root
     max-pool-size: '10'

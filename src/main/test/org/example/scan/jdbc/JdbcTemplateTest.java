@@ -1,40 +1,48 @@
-package org.example.scan;
+package org.example.scan.jdbc;
 
 import org.example.config.PropertyResolver;
 import org.example.ioc.AnnotationConfigApplicationContext;
 import org.example.ioc.ApplicationContext;
 import org.example.ioc.ApplicationContextUtils;
+import org.example.jdbc.JdbcTemplate;
 import org.example.test.ConfigMain;
-import org.example.test.ConfigT1;
+import org.example.test.jdbc.User;
 import org.example.utils.YamlUtils;
 import org.junit.Before;
 import org.junit.Test;
 
-import javax.sql.DataSource;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-public class JdbcTest {
+public class JdbcTemplateTest {
     @Before
     public void before() throws IOException, URISyntaxException, ClassNotFoundException {
         Properties properties = new Properties();
         properties.load(ClassLoader.getSystemResourceAsStream("test.properties"));
         Map<String, Object> config = YamlUtils.loadYamlAsPlainMap();
         properties.putAll(config);
-
         PropertyResolver pr = new PropertyResolver(properties);
         ApplicationContextUtils.setApplicationContext(new AnnotationConfigApplicationContext(ConfigMain.class, pr));
     }
 
     @Test
-    public void getDataSource(){
-        ApplicationContext context = ApplicationContextUtils.getRequiredApplicationContext();
-        DataSource dataSource = context.getBean("dataSource");
-        System.out.println(dataSource);
+    public void test1(){
+        ApplicationContext context = ApplicationContextUtils.getApplicationContext();
+        JdbcTemplate template = new JdbcTemplate(context.getBean("dataSource"));
+        List<User> list = template.queryForList("select * from account", User.class);
+        list.forEach(System.out::println);
     }
 
-
-
+    @Test
+    public void test2(){
+        ApplicationContext context = ApplicationContextUtils.getApplicationContext();
+        JdbcTemplate template = new JdbcTemplate(context.getBean("dataSource"));
+        String ss = template.queryForObject("select * from account where id = ?",String.class,1);
+        System.out.println(ss);
+    }
 }

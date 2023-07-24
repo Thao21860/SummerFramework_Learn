@@ -1,13 +1,12 @@
 package org.example.jdbc;
 
+import org.example.annotation.Primary;
 import org.example.exception.DataAccessException;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -17,13 +16,13 @@ public class JdbcTemplate {
     public JdbcTemplate(DataSource dataSource) {
         this.dataSource = dataSource;
     }
-    //实现update
-    public int update(String sql, Object... args){
-        return execute(
-                preparedStatementCreator(sql, args),
-                // 实现 ConnectionCallback中的函数式接口，调用ps的executeUpdate方法
-                PreparedStatement::executeUpdate);
+    /*
+    read
+     */
+    public Number queryForNumber(String sql, Object...args) throws DataAccessException {
+        return queryForObject(sql, NumberRawMapper.instance,args);
     }
+
     // 实现QueryList
     public <T> List<T> queryForList(String sql, Class<T> clazz,Object... args){
         return queryForList(sql,new BeanRowMapper<>(clazz),args);
@@ -33,6 +32,7 @@ public class JdbcTemplate {
             List<T> list = new ArrayList<>();
             try(ResultSet rs = ps.executeQuery()){
                 while (rs.next()){
+                    // 最初光标位于第一行之前，初始也需要调用next。
                     // row 是 rs 维护的一个光标，指向当前项
                     list.add(rowMapper.mapRow(rs,rs.getRow()));
                 }
@@ -40,7 +40,74 @@ public class JdbcTemplate {
             return list;
         });
     }
+    @SuppressWarnings("unchecked")
+    public <T> T queryForObject(String sql, Class<T> clazz, Object...args) throws DataAccessException{
+        if (clazz == String.class){
+            return (T) queryForObject(sql, StringRowMapper.instance,args);
+        }
+        if (clazz == Boolean.class){
+            return (T) queryForObject(sql, BooleanRowMapper.instance, args);
+        }
+        if (clazz.isAssignableFrom(Number.class) || clazz.isPrimitive()){
+            return (T) queryForObject(sql, NumberRawMapper.instance, args);
+        }
+        return queryForObject(sql, new BeanRowMapper<>(clazz), args);
+    }
+    // 实现queryObject
+    public <T> T queryForObject(String sql, RowMapper<T> rowMapper, Object... args) throws DataAccessException{
+        return execute(preparedStatementCreator(sql,args), (PreparedStatement ps) -> {
+            T t = null;
+            try(ResultSet rs = ps.executeQuery()){
+                while (rs.next()){
+                    if (t == null){
+                        t = rowMapper.mapRow(rs, rs.getRow());
+                    }else {
+                        throw new DataAccessException("multi result found");
+                    }
+                }
+                if (t == null){
+                    throw new DataAccessException("empty result found");
+                }
+            }
+            return t;
+        });
+    }
+    /*
+    write
+     */
+    //实现update
+    public int update(String sql, Object... args){
+        return execute(
+                preparedStatementCreator(sql, args),
+                // 实现 ConnectionCallback中的函数式接口，调用ps的executeUpdate方法
+                PreparedStatement::executeUpdate);
+    }
+
+    public Number updateAndReturnGeneratedKey(String sql, Object...args){
+        return execute((Connection con) -> {
+            PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            bindArgs(ps,args);
+            return ps;
+            },
+            (PreparedStatement ps) -> {
+                int n = ps.executeUpdate();
+                if (n == 0){
+                    throw new DataAccessException("0 rows inserted");
+                }
+                if (n > 1){
+                    throw new DataAccessException("multi rows inserted");
+                }
+                try(ResultSet keys = ps.getGeneratedKeys()){
+                    while (keys.next()){
+                        return (Number) keys.getObject(1);
+                    }
+                }
+                throw new DataAccessException(" should not reach here");
+            });
+    }
+
     // 实现creator中的createPreparedStatement，即获取connection返回preparedStatement
+    // creator 对sql语句进行预编译
     private PreparedStatementCreator preparedStatementCreator(String sql, Object... args){
         return (Connection con) -> {
             PreparedStatement ps = con.prepareStatement(sql);
@@ -48,7 +115,7 @@ public class JdbcTemplate {
             return ps;
         };
     }
-    // 写入参数
+    // 对sql语句中的？赋值
     private void bindArgs(PreparedStatement ps, Object... args) throws SQLException{
         for (int i = 0; i < args.length; i++){
             ps.setObject(i+1,args[i]);
@@ -78,7 +145,14 @@ class StringRowMapper implements RowMapper<String> {
 
     @Override
     public String mapRow(ResultSet rs, int rowNum) throws SQLException {
-        return rs.getString(1);
+        ResultSetMetaData meta = rs.getMetaData();
+        int columns = meta.getColumnCount();
+        String[] ss = new String[columns];
+        for (int i = 1; i <= columns; i++){
+            ss[i - 1] = rs.getString(i);
+        }
+        return Arrays.toString(ss);
+//        return rs.getString(1);
     }
 }
 

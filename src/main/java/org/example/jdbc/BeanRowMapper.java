@@ -12,7 +12,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
-// 解析jdbc的结果，装入T类型的bean
+// 反序列化
 public class BeanRowMapper<T> implements RowMapper<T>{
     Class<T> clazz;
     Constructor<T> constructor;
