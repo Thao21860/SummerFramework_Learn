@@ -26,8 +26,8 @@ public abstract class AnnotationProxyPostProcessor<A extends Annotation> impleme
     public Object postProcessBeforeInitialization(Object bean, String beanName) {
         // AOP装配
         Class<?> beanClass = bean.getClass();
-        // 查找Around注解
-        Around anno = beanClass.getAnnotation(Around.class);
+        // 查找注解
+        A anno = beanClass.getAnnotation(annoClass);
         if(anno != null){
             String handlerName ;
             try{

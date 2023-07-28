@@ -3,9 +3,13 @@ package org.example.jdbc;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.example.annotation.AutoWired;
 import org.example.annotation.Bean;
 import org.example.annotation.Configuration;
 import org.example.annotation.Value;
+import org.example.transaction.DataSourceTransactionManager;
+import org.example.transaction.PlatformTransactionManager;
+import org.example.transaction.TransactionalBeanPostProcessor;
 
 import javax.sql.DataSource;
 
@@ -31,4 +35,17 @@ public class JdbcConfig {
         config.setConnectionTimeout(timeOut);
         return new HikariDataSource(config);
     }
+    @Bean
+    public JdbcTemplate jdbcTemplate(@AutoWired DataSource dataSource){
+        return new JdbcTemplate(dataSource);
+    }
+    @Bean
+    public TransactionalBeanPostProcessor transactionalBeanPostProcessor(){
+        return new TransactionalBeanPostProcessor();
+    }
+    @Bean
+    public PlatformTransactionManager platformTransactionManager(@AutoWired DataSource dataSource){
+        return new DataSourceTransactionManager(dataSource);
+    }
+
 }

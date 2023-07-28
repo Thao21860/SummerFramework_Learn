@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Component
-// 处理context2 代理
+// 处理context2 静态代理
 public class PostProcessorOne implements BeanPostProcessor {
     Map<String ,Object> originMap = new HashMap<>();
     @Override

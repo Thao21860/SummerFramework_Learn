@@ -1,12 +1,11 @@
 package org.example.scan.jdbc;
 
 import org.example.config.PropertyResolver;
-import org.example.ioc.AnnotationConfigApplicationContext;
-import org.example.ioc.ApplicationContext;
-import org.example.ioc.ApplicationContextUtils;
+import org.example.ioc.*;
 import org.example.jdbc.JdbcTemplate;
 import org.example.test.ConfigMain;
 import org.example.test.jdbc.User;
+import org.example.test.postPorcessor.TransactionalTest;
 import org.example.utils.YamlUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -44,5 +43,18 @@ public class JdbcTemplateTest {
         JdbcTemplate template = new JdbcTemplate(context.getBean("dataSource"));
         String ss = template.queryForObject("select * from account where id = ?",String.class,1);
         System.out.println(ss);
+    }
+    @Test
+    public void transactionTest1(){
+        ApplicationContext context = ApplicationContextUtils.getApplicationContext();
+        TransactionalTest test = context.getBean("transactionalTest");
+        test.add();
+    }
+    @Test
+    public void transactionTest2(){
+        ConfigurableApplicationContext context = (ConfigurableApplicationContext) ApplicationContextUtils.getApplicationContext();
+        TransactionalTest test = context.getBean("transactionalTest");
+        BeanDefinition def = context.findBeanDefinition("transactionalTest");
+        test.update();
     }
 }

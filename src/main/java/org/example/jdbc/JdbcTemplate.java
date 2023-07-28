@@ -1,15 +1,13 @@
 package org.example.jdbc;
 
-import org.example.annotation.Primary;
 import org.example.exception.DataAccessException;
+import org.example.transaction.TransactionUtils;
 
 import javax.sql.DataSource;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-
 public class JdbcTemplate {
     final DataSource dataSource;
 
@@ -97,12 +95,14 @@ public class JdbcTemplate {
                 if (n > 1){
                     throw new DataAccessException("multi rows inserted");
                 }
-                try(ResultSet keys = ps.getGeneratedKeys()){
-                    while (keys.next()){
-                        return (Number) keys.getObject(1);
-                    }
-                }
-                throw new DataAccessException(" should not reach here");
+                return n;
+                // TODO:resultSet.next 总是返回false
+//                try(ResultSet keys = ps.getGeneratedKeys()){
+//                    while (keys.next()){
+//                        return (Number) keys.getObject(1);
+//                    }
+//                }
+//                throw new DataAccessException(" should not reach here");
             });
     }
 
@@ -123,7 +123,17 @@ public class JdbcTemplate {
     }
 
     // action 为函数，需要实现
-    public <T> T execute(ConnectionCallback<T> action){
+    public <T> T execute(ConnectionCallback<T> action) throws DataAccessException{
+        // 有事务时使用当前事务连接
+        Connection current = TransactionUtils.getCurrentConnection();
+        if (current != null) {
+            try {
+                return action.doInConnection(current);
+            } catch (SQLException e) {
+                throw new DataAccessException(e);
+            }
+        }
+        // 无事务使用dataSource获取新连接
         try(Connection connection = this.dataSource.getConnection()){
             return action.doInConnection(connection);
         }catch (SQLException e){
