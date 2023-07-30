@@ -1,4 +1,4 @@
-package org.example.jdbc;
+package org.example.test;
 
 
 import com.zaxxer.hikari.HikariConfig;
@@ -7,6 +7,7 @@ import org.example.annotation.AutoWired;
 import org.example.annotation.Bean;
 import org.example.annotation.Configuration;
 import org.example.annotation.Value;
+import org.example.jdbc.JdbcTemplate;
 import org.example.transaction.DataSourceTransactionManager;
 import org.example.transaction.PlatformTransactionManager;
 import org.example.transaction.TransactionalBeanPostProcessor;

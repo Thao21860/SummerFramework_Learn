@@ -13,7 +13,7 @@ public class YamlUtils {
         Yaml yaml = new Yaml();
         // 输入流
         InputStream stream = YamlUtils.class.getClassLoader().
-                getResourceAsStream("application.yml");
+                getResourceAsStream("/application.yml");
         // object 转为 string
         // yaml读取结果为多层级的map，需要拉平
         Map<String, Object> yamMap = yaml.load(stream);

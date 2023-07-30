@@ -1,13 +1,16 @@
 package org.example.scan;
 
+import javax.print.URIException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Stream;
 public class ResourceResolver {
@@ -17,46 +20,81 @@ public class ResourceResolver {
         this.basePackage = basePackage;
     }
 
-    public <R>List<R> scan(Function<Resource,R> mapper) throws URISyntaxException, IOException {
+    public <R>List<R> scan(Function<Resource,R> mapper)  {
         String basePackagePath = this.basePackage.replace(".", "\\");
         String pkgPath = basePackagePath;
-        //通过classloader获取资源位置
-        URI pkg = Objects.requireNonNull(ClassLoader.getSystemClassLoader().getResource(pkgPath)).toURI();
-        List<R> allClasses = new ArrayList<>();
-
-        Path root;
-        if (pkg.toString().startsWith("jar:")) {
-            try {
-                // 传入jar包会从包路径获取路径
-                root = FileSystems.getFileSystem(pkg).getPath(pkgPath);
-            } catch (final FileSystemNotFoundException e) {
-                // 将压缩文件的URI转成对应的Path
-                root = FileSystems.newFileSystem(pkg, Collections.emptyMap()).getPath(pkgPath);
+        try {
+            List<R> collector = new ArrayList<>();
+            scan0(basePackagePath, pkgPath,collector, mapper);
+            return collector;
+        } catch (IOException e){
+            throw new UncheckedIOException(e);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    <R> void scan0(String basePackagePath, String path, List<R> collector, Function<Resource,R> mapper) throws IOException, URISyntaxException{
+        Enumeration<URL> en = getContextClassLoader().getResources(path);
+        while (en.hasMoreElements()) {
+            URL url = en.nextElement();
+            URI uri = url.toURI();
+            String uriStr = removeTrailingSlash(uriToString(uri));
+            String uriBaseStr = uriStr.substring(0,uriStr.length() - basePackagePath.length());
+            if (uriBaseStr.startsWith("file:")) {
+                uriBaseStr = uriBaseStr.substring(5);
             }
-        } else {
-            // uri转为路径
-            root = Paths.get(pkg);
+            if (uriStr.startsWith("jar:")) {
+                scanFile(true,uriBaseStr, jarUriToPath(basePackagePath, uri),collector, mapper);
+            } else {
+                scanFile(false,uriBaseStr, Paths.get(uri), collector, mapper);
+            }
         }
-
-        final String extension = ".class";
-        // 一个遍历目录下所有文件的api，传入参数是一个Path，后面的标准写法就是接:isRegularFile
-        try (final Stream<Path> allPaths = Files.walk(root)) {
-            allPaths.filter(Files::isRegularFile).forEach(file -> {
-                try {
-
-                    final String path = file.toString().replace('\\', '.');
-                    final String name = path.substring(path.indexOf(this.basePackage), path.length());
-                    Resource res = new Resource(path, name);
-                    allClasses.add((mapper.apply(res)));
-                } catch (final StringIndexOutOfBoundsException ignored) {
-                }
-            });
-        }
-        return allClasses;
     }
 
+    <R> void scanFile(boolean isJar, String base, Path root, List<R> collector, Function<Resource, R> mapper) throws IOException {
+        String baseDir = removeTrailingSlash(base);
+        Files.walk(root).filter(Files::isRegularFile).forEach( file -> {
+            Resource res = null;
+            if (isJar) {
+                res = new Resource(baseDir, removeLeadingSlash(file.toString()));
+            } else {
+                String path = file.toString();
+                String name = removeLeadingSlash(path.substring(baseDir.length()));
+                res = new Resource("file:" + path, name);
+            }
+            R r = mapper.apply(res);
+            if (r != null){
+                collector.add(r);
+            }
+        });
+    }
+    ClassLoader getContextClassLoader(){
+        ClassLoader cl = null;
+        cl = Thread.currentThread().getContextClassLoader();
+        if (cl == null){
+            cl = getClass().getClassLoader();
+        }
+        return cl;
+    }
+    String uriToString(URI uri) throws UnsupportedEncodingException {
+        return URLDecoder.decode(uri.toString(), String.valueOf(StandardCharsets.UTF_8));
+    }
 
-
+    Path jarUriToPath(String basePackagePath, URI jarUri) throws IOException {
+        return FileSystems.newFileSystem(jarUri, Collections.emptyMap()).getPath(basePackagePath);
+    }
+    String removeLeadingSlash(String s) {
+        if (s.startsWith("/") || s.startsWith("\\")) {
+            s = s.substring(1);
+        }
+        return s;
+    }
+    String removeTrailingSlash(String s) {
+        if (s.endsWith("/") || s.endsWith("\\")) {
+            s = s.substring(0, s.length() - 1);
+        }
+        return s;
+    }
     public static void main(String[] args) throws URISyntaxException, IOException {
         ResourceResolver resourceResolver = new ResourceResolver("org.example");
         // lambda表达式 定义mapper

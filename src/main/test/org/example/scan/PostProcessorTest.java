@@ -22,7 +22,6 @@ public class PostProcessorTest {
         properties.load(ClassLoader.getSystemResourceAsStream("test.properties"));
         Map<String, Object> config = YamlUtils.loadYamlAsPlainMap();
         properties.putAll(config);
-
         PropertyResolver pr = new PropertyResolver(properties);
         ApplicationContextUtils.setApplicationContext(new AnnotationConfigApplicationContext(ConfigT1.class, pr));
     }

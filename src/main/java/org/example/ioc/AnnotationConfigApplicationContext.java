@@ -187,8 +187,8 @@ public class AnnotationConfigApplicationContext implements ConfigurableApplicati
             Object depends = name.isEmpty() ? findBean(accessibleType) : findBean(name,accessibleType);
             if(required && depends == null){
                 // 注解缺少参数
-                throw new UnsatisfiedDependencyException(String.format("Dependency bean %s not found when inject %s.%s for bean '%s': %s", beanClass.getSimpleName(),
-                        accessibleName, def.getName(), def.getBeanClass().getName()));
+                throw new UnsatisfiedDependencyException(String.format("Dependency bean not found when inject %s.%s for bean '%s': %s",
+                        beanClass.getSimpleName(), accessibleName, def.getName(), def.getBeanClass().getName()));
             }
             if( depends != null){
                 if(field != null){

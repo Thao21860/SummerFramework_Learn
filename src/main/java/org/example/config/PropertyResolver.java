@@ -1,6 +1,6 @@
 package org.example.config;
 
-import com.sun.istack.internal.NotNull;
+import jakarta.annotation.Nullable;
 
 import java.time.*;
 import java.util.*;
@@ -57,7 +57,7 @@ public class PropertyResolver {
         return this.properties.containsKey(key);
     }
     // 查询
-    @NotNull
+    @Nullable
     public String getProperty(String key){
         //依靠配置文件解析解决${}格式问题
         PropertyExpr propertyExpr = parsePropertyExpr(key);
@@ -88,7 +88,7 @@ public class PropertyResolver {
         return value == null ? defaultValue: value;
     }
     // getProperty重载2，类型转换入口
-    @NotNull
+    @Nullable
     public <T> T getProperty(String key, Class<T> targetType){
         String value = getProperty(key);
         if(value == null) return null;
