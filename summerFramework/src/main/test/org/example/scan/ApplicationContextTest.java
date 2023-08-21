@@ -3,9 +3,8 @@ package org.example.scan;
 import org.example.config.PropertyResolver;
 import org.example.ioc.AnnotationConfigApplicationContext;
 import org.example.test.ConfigMain;
-import org.example.test.ConfigT1;
-import org.example.test.ContextT1;
-import org.example.test.ContextT2;
+import org.example.test.ioc.ConfigT1;
+import org.example.test.ioc.ContextT1;
 import org.example.utils.YamlUtils;
 import org.junit.Test;
 

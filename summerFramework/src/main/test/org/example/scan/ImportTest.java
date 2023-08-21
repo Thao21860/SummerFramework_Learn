@@ -5,9 +5,6 @@ import org.example.config.PropertyResolver;
 import org.example.ioc.AnnotationConfigApplicationContext;
 import org.example.ioc.ApplicationContext;
 import org.example.ioc.ApplicationContextUtils;
-import org.example.test.ConfigT1;
-import org.example.test.ContextT1;
-import org.example.test2.ContextT4;
 import org.example.utils.ClassUtils;
 import org.example.utils.YamlUtils;
 import org.junit.Before;
@@ -19,8 +16,7 @@ import java.util.Map;
 import java.util.Properties;
 
 public class ImportTest {
-    @Before
-    public void before() throws IOException, URISyntaxException, ClassNotFoundException {
+    public ImportTest() throws IOException, URISyntaxException, ClassNotFoundException {
         Properties properties = new Properties();
         properties.load(ClassLoader.getSystemResourceAsStream("test.properties"));
         Map<String, Object> config = YamlUtils.loadYamlAsPlainMap();
@@ -32,8 +28,8 @@ public class ImportTest {
     @Test
     public void test1(){
         ApplicationContext context = ApplicationContextUtils.getRequiredApplicationContext();
-        ContextT4 contextT4 = context.getBean("contextT4");
-        System.out.println(contextT4);
+        ContextT3 contextT3 = context.getBean("contextT3");
+        System.out.println(contextT3);
     }
     @Test
     public void test2(){

@@ -5,16 +5,14 @@ import org.example.config.PropertyResolver;
 import org.example.ioc.AnnotationConfigApplicationContext;
 import org.example.ioc.ApplicationContext;
 import org.example.ioc.ApplicationContextUtils;
-import org.example.ioc.BeanPostProcessor;
-import org.example.test.ConfigT1;
-import org.example.test.ContextT2;
+import org.example.test.ioc.ConfigT1;
+import org.example.test.ioc.ContextT2;
 import org.example.test.aop.PoliteInvocationHandler;
 import org.example.utils.YamlUtils;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.URISyntaxException;
@@ -40,7 +38,7 @@ public class AopTest {
     }
     @Test
     public void aroundExist() throws ClassNotFoundException {
-        Class<?> clazz = Class.forName("org.example.test.ContextT2");
+        Class<?> clazz = Class.forName("org.example.test.ioc.ContextT2");
         Around anno = clazz.getAnnotation(Around.class);
         System.out.println(anno);
     }

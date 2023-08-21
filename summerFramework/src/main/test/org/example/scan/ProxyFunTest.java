@@ -1,8 +1,7 @@
 package org.example.scan;
 
 import org.example.AOP.ProxyResolver;
-import org.example.config.PropertyResolver;
-import org.example.test.ContextT2;
+import org.example.test.ioc.ContextT2;
 import org.example.test.aop.PoliteInvocationHandler;
 import org.junit.Test;
 

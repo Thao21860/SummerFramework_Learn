@@ -10,10 +10,10 @@
 
     <context-param>
         <param-name>configuration</param-name>
-        <param-value>org.example.mvc.webapp.WebAppConfig</param-value>
+        <param-value>org.summer.mvc.webapp.WebAppConfig</param-value>
     </context-param>
 
     <listener>
-        <listener-class>org.example.mvc.web.ContextLoaderListener</listener-class>
+        <listener-class>org.summer.mvc.web.ContextLoaderListener</listener-class>
     </listener>
 </web-app>

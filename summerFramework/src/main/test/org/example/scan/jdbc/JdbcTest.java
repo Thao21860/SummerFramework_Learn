@@ -5,14 +5,12 @@ import org.example.ioc.AnnotationConfigApplicationContext;
 import org.example.ioc.ApplicationContext;
 import org.example.ioc.ApplicationContextUtils;
 import org.example.test.ConfigMain;
-import org.example.test.ConfigT1;
 import org.example.utils.YamlUtils;
 import org.junit.Before;
 import org.junit.Test;
 
 import javax.sql.DataSource;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.net.URISyntaxException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
